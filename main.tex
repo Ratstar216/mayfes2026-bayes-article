@@ -104,7 +104,8 @@ setpagesize=false,
 (この記事の執筆時点で, 企画の詳細が定まっていないため, ボードゲーム班の企画とどの程度関連があるのかは分かりませんが, ご了承ください. )\\
 ベイズ的な考え方はニューラルネットワークなどの機械学習の分野でもよく用いられており, ベイジアンニューラルネットワーク (BNN) などが知られています. 
 ここでは BNN 自体は扱いませんが, 直感的に理解しやすい回帰という問題設定において, ベイズ的な考え方と, それとよく対比される頻度論的 (frequentist)な考え方を比較して, ベイズの有用性を探ります. \\
-他の記事は難しそうなのですが, この記事は高校生でも理解できる説明を目指します. 
+他の記事は難しそうなのですが, この記事は高校生でも理解できる説明を目指します(というつもりで書いたのですが, 行列を回避できませんでした...). 
+\vspace{-0.5em}
 \subsection{回帰}
 まず, 回帰について説明します. ここで扱う回帰とは, 二つのデータの組 $(x_i, y_i)$ が与えられたときに, それらの関係を推定する問題です(なお, 一般的には「回帰」はもっと広い問題設定ですが, ここではその特別な場合を扱います). 
 さっそく例を見てみましょう. 
@@ -188,28 +189,60 @@ $w_0 = 0.0790, w_1 = 1.09, w_2 = -0.0618, w_3 = -0.218$ \\
     p(\mathcal{D} | \bm{w}) &= \prod_{i=1}^5 \mathcal{N}(y_i | w_0 + w_1 x_i + w_2 x_i^2 + w_3 x_i^3, \sigma_y^2) \\
     p(\bm{w}) &= \prod_{i=0}^3 \mathcal{N}(w_i | 0, \sigma_w^2)
 \end{align}
-なので(以下, 途中で出てくる $\bm{w}$ に関係ない定数は重要でないので \text{const} と書きます), 
+となります. ここで,
+\begin{align*}
+    \bm{y} &=
+    \begin{pmatrix}
+        y_1 \\ y_2 \\ y_3 \\ y_4 \\ y_5
+    \end{pmatrix}, &
+    \bm{w} &=
+    \begin{pmatrix}
+        w_0 \\ w_1 \\ w_2 \\ w_3
+    \end{pmatrix}, &
+    \bm{\phi}(x_i) &=
+    \begin{pmatrix}
+        1 \\ x_i \\ x_i^2 \\ x_i^3
+    \end{pmatrix}
+\end{align*}
+とし, さらに $\bm{\phi}(x_i)$ を縦に並べた行列
+\begin{align*}
+    \Phi =
+    \begin{pmatrix}
+        \bm{\phi}(x_1)^\top \\
+        \bm{\phi}(x_2)^\top \\
+        \bm{\phi}(x_3)^\top \\
+        \bm{\phi}(x_4)^\top \\
+        \bm{\phi}(x_5)^\top
+    \end{pmatrix}
+\end{align*}
+を導入します. すると, モデルの予測値 $w_0 + w_1 x_i + w_2 x_i^2 + w_3 x_i^3$ は $\bm{\phi}(x_i)^\top \bm{w}$ と書けます. \\
+この表記を使うと(以下, 途中で出てくる $\bm{w}$ に関係ない定数は重要でないので \text{const} と書きます), 
 \begin{align}
-    p(\bm{w} | \mathcal{D}) &= \frac{1}{p(\mathcal{D})} \left(\prod_{i=1}^5 \frac{1}{\sqrt{2\pi\sigma_y^2}} \exp\left(-\frac{(y_i - (\sum_{j=0}^3 w_j x_i^j))^2}{2\sigma_y^2}\right)\right) \prod_{i=0}^3 \frac{1}{\sqrt{2\pi\sigma_w^2}} \exp\left(-\frac{w_i^2}{2\sigma_w^2}\right) \\
-    &= \text{const} \times \prod_{i=1}^5 \exp\left(-\frac{(y_i - (\sum_{j=0}^3 w_j x_i^j))^2}{2\sigma_y^2}\right) \prod_{i=0}^3 \exp\left(-\frac{w_i^2}{2\sigma_w^2}\right) \\
-    &= \text{const} \times \exp\left(-\frac{1}{2\sigma_y^2} \sum_{i=1}^5 (y_i - (\sum_{j=0}^3 w_j x_i^j))^2 - \frac{1}{2\sigma_w^2} \sum_{i=0}^3 w_i^2\right) \\
-    &= \text{const} \times \exp\left(-\sum_{i=0}^3 \left(\left(\frac{1}{2\sigma_w^2} + \frac{1}{2\sigma_y^2}\sum_{j=1}^5 x_j^{2i} \right) w_i^2 - \frac{1}{\sigma_y^2} \sum_{j=1}^5 y_j x_j^i w_i\right)\right) \\
-    &= \text{const} \times \prod_{i=0}^3 \exp\left(-\cfrac{1}{2\left(\cfrac{1}{\cfrac{1}{\sigma_w^2} + \cfrac{1}{\sigma_y^2}\sum_{j=0}^5 x_j^{2i}}\right)} \left(w_i - \cfrac{\sum_{j=0}^{5} y_j x_j^{i}}{\cfrac{\sigma_y^2}{\sigma_w^2} + \sum_{j=0}^5 x_j^{2i}} \right)^2\right) \label{eq:posterior}
+    p(\bm{w} | \mathcal{D})
+    &= \text{const} \times \exp\left(
+        -\frac{1}{2\sigma_y^2}\norm{\bm{y} - \Phi \bm{w}}^2
+        -\frac{1}{2\sigma_w^2}\bm{w}^\top \bm{w}
+    \right) \\
+    &= \text{const} \times \exp\left(
+        -\frac{1}{2}\bm{w}^\top \left(
+            \frac{1}{\sigma_y^2}\Phi^\top \Phi + \frac{1}{\sigma_w^2}I
+        \right)\bm{w}
+        + \frac{1}{\sigma_y^2}\bm{y}^\top \Phi \bm{w}
+    \right) \label{eq:posterior}
 \end{align}
-さて, 計算が長くなってしまいましたが, \eqref{eq:posterior}式は, 定数を考えなければガウス分布の積のような形をしています. 実際, 定数部分 \text{const} は, 確率密度関数を積分したときに 1 になることを保証する規格化定数で, 
-結局 \eqref{eq:posterior}式は, 
+この式の指数部分を平方完成すると, \eqref{eq:posterior}式は 4 変数のガウス分布になって, 
 \begin{align}
-    p(\bm{w} | \mathcal{D}) = \prod_{i=0}^3 \mathcal{N}(w_i | \mu_{w_i}, \sigma_{w_i}^2)
+    p(\bm{w} | \mathcal{D}) = \mathcal{N}(\bm{w} | \bm{\mu}_w, \Sigma_w)
 \end{align}
 と書けます. 
 ここで, 
 \begin{align}
-    \mu_{w_i} &= \cfrac{\sum_{j=0}^{5} y_j x_j^{i}}{\cfrac{\sigma_y^2}{\sigma_w^2} + \sum_{j=0}^5 x_j^{2i}} \label {eq:mu_{w_i}} \\ 
-    \sigma_{w_i}^2 &= \cfrac{1}{\cfrac{1}{\sigma_w^2} + \cfrac{1}{\sigma_y^2}\sum_{j=0}^5 x_j^{2i}} \label {eq:sigma_{w_i}^2}
+    \Sigma_w^{-1} &= \frac{1}{\sigma_y^2}\Phi^\top \Phi + \frac{1}{\sigma_w^2}I \label{eq:sigma_w_post} \\
+    \bm{\mu}_w &= \frac{1}{\sigma_y^2}\Sigma_w \Phi^\top \bm{y} \label{eq:mu_w_post}
 \end{align}
 としました. \\
 このセクションの結果をまとめると, データ $\mathcal{D}$ によって, パラメータ $\bm{w}$ の分布を更新することができて, 
-具体的には $w_i$ はそれぞれ \eqref{eq:mu_{w_i}} と \eqref{eq:sigma_{w_i}^2} から定まるガウス分布 $\mathcal{N}(\mu_{w_i}, \sigma_{w_i}^2)$ に従うと考えることができます. 
+具体的には $\bm{w}$ 全体が \eqref{eq:sigma_w_post} と \eqref{eq:mu_w_post} から定まるガウス分布 $\mathcal{N}(\bm{\mu}_w, \Sigma_w)$ に従うと考えることができます. 
 これは先ほどの頻度論的な考え方(最小二乗法)とは明らかに違いますね. 最小二乗法では $\bm{w}$ の値は一つに決まりましたが, ここではどの値をとるか定まっておらず確率的です. 
 \subsubsection{予測分布の計算}
 最後に, 更新したパラメータ(の分布)を使って, $x_i$ と $y_i$ の関係性を推定することを考えましょう. もともとこれが目的でした. そのために, 新しく $x_k$ が与えられたときに, 
@@ -219,8 +252,42 @@ $w_0 = 0.0790, w_1 = 1.09, w_2 = -0.0618, w_3 = -0.218$ \\
 \end{align}
 これを計算せず, ガウス分布の再生性という性質を用いると,  \eqref{eq:likelihood} と \eqref{eq:posterior} より(詳細は省きますが), 
 \begin{align}
-    p(y_k | x_k, \mathcal{D}) = \mathcal{N}\left(y_k \mid \sum_{i=0}^3 \mu_{w_i} x_k^i, \sum_{i=0}^3 \sigma_{w_i}^2 x_k^{2i} + \sigma_y^2\right)
+    p(y_k | x_k, \mathcal{D}) = \mathcal{N}\left(y_k \mid \bm{\phi}(x_k)^\top \bm{\mu}_w, \bm{\phi}(x_k)^\top \Sigma_w \bm{\phi}(x_k) + \sigma_y^2\right) \label{eq:predictive}
 \end{align}
 となります. これも最小二乗法の結果と違うことがわかります. 最小二乗法では, $y_k = \sum_{i=0}^3 w_i x_k^i$ と決定的に値が決まりますが, ここではやはり確率的に $y_k$ の値を推定しています. 
+\subsubsection{結果の可視化}
+最後に, ここで得られたベイズ線形回帰の結果を可視化します. ここでは $\sigma_y^2 = 0.04$, $\sigma_w^2 = 1$ としました. 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{images/bayes1_fit.png}
+  \caption{ベイズ線形回帰の結果}
+  \label{fig:bayes}
+\end{figure}
+ここで, 濃い赤い線が \eqref{eq:predictive} に示されている予測分布の平均値です. 薄い領域は, それに対して標準偏差の 2 倍を足したものと引いたものを表しています. ガウス分布なので, これはおよそ 95\% の確率でこの範囲に収まるというある種の確信度を表していると見ることもできます. データが少ない左端と右端はあまり自信がないことがわかりますね. \\
+さらに, この後新しくデータを観測することができて, 合計 100 個のデータを使えるようになったとしましょう. その場合, 以下のようになります. 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{images/bayes2_fit.png}
+  \caption{ベイズ線形回帰の結果2}
+  \label{fig:bayes2}
+\end{figure}
+データが多くなったことで, 薄赤の領域が狭くなってきました. これは, たくさんのデータを得て, 信頼度が上がってきたと見ることができます. 
+\subsection{おわりに}
+ベイズ線形回帰について説明しました. 頻度論的なアプローチに対して, ベイズ的な考え方は不確実性を上手く扱えるという長所がありますが, 一方で短所もあります. その一つは, 事前分布の仮定です. 何も仮定しなくて良い最小二乗法と比べて, 
+今回扱ったベイズ線形回帰は事前分布を仮定しました. この仮定はそれなりに強い仮定で, 必ずしも上手くいくとは限りません. 
+この記事を書くにあたって,  \cite{grosse2018bayesianlinearregression}, \cite{suyama2019bayesianDeepLearning} を参考にしました. 
+
+\begin{thebibliography}{9}
+  \bibitem{grosse2018bayesianlinearregression}
+  Grosse, Roger and Farahmand, Amir-massoud and Carrasquilla, Juan.
+  \textit{CSC 411 Lecture 19: Bayesian Linear Regression}.
+  University of Toronto, 2018.
+  \url{https://www.cs.toronto.edu/~rgrosse/courses/csc411_f18/slides/lec19-slides.pdf}
+  accessed on 2026-04-26.
+  \bibitem{suyama2019bayesianDeepLearning}
+  須山, 敦志.
+  \textit{ベイズ深層学習}.
+  講談社, 2019.
+\end{thebibliography}
 
 \end{document}
