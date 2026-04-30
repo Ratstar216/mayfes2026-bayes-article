@@ -101,13 +101,21 @@ setpagesize=false,
 \hrule \vskip.5mm\hrule
 \vspace{1em}
 \subsection{はじめに}
-(この記事の執筆時点で, 企画の詳細が定まっていないため, ボードゲーム班の企画とどの程度関連があるのかは分かりませんが, ご了承ください. )\\
 ベイズ的な考え方はニューラルネットワークなどの機械学習の分野でもよく用いられており, ベイジアンニューラルネットワーク (BNN) などが知られています. 
-ここでは BNN 自体は扱いませんが, 直感的に理解しやすい回帰という問題設定において, ベイズ的な考え方と, それとよく対比される頻度論的 (frequentist)な考え方を比較して, ベイズの有用性を探ります. \\
-他の記事は難しそうなのですが, この記事は高校生でも理解できる説明を目指します(というつもりで書いたのですが, 行列を回避できませんでした...). 
+ここでは BNN 自体は扱いませんが, 直感的に理解しやすい回帰という問題設定において, ベイズ的な考え方と, それとよく対比される頻度論的 (frequentist)な考え方を比較して, ベイズの有用性を探ります.
+\subsubsection*{今回扱うベイズ回帰の位置付け}
+ここで説明するベイズ回帰はベイズ最適化と関係が深く, さらにベイズ最適化はゲーム AI のハイパーパラメータの最適化(チューニング)などに使われています \cite{bayesian-optimization-in-alphago}. 
+例えば, AI の(特定の相手に対する)勝率はハイパーパラメータ $\theta$ の関数 $p(\theta)$と見ることができ, それを最大化することが一つの目標になり得ます. この関数が例えば二次関数であれば(そんなことは実際はほぼないのですが), 簡単に最大化できますが, もし以下のような性質を持っていたらどうでしょう \cite{tutorial-on-bayesian-optimization}. 
+\begin{itemize}
+    \item $p$ は最大化しやすい「良い性質」を持っていない. ここでいう「良い性質」とは, 例えば二次関数で書ける, 凸である, など. 
+    \item 一つのパラメータの組 $\theta_0$ について値 $p(\theta_0)$ を得ることはできるが, 時間とコストがかかる(ので, あまりたくさんのパラメータについて計算することはできない). これは, 例えば勝率を求めるために AI を何回も対戦させないといけないことから想像がつくでしょう. 
+\end{itemize}
+つまり, $p$ はブラックボックスのようなものです. そのような場合に, その関数を得られたデータをもとにガウス過程回帰\footnote{ガウス過程は, 多変量ガウス分布の無限次元への一般化のようなもの.}と呼ばれる方法で近似して扱うことがあります \cite{tutorial-on-bayesian-optimization} \cite{gaussian-process-and-bayesian-optimization}. ガウス過程回帰は, 今回扱うベイズ回帰の具体例の拡張だと思っていただいて構いません.
+
+
 \vspace{-0.5em}
 \subsection{回帰}
-まず, 回帰について説明します. ここで扱う回帰とは, 二つのデータの組 $(x_i, y_i)$ が与えられたときに, それらの関係を推定する問題です(なお, 一般的には「回帰」はもっと広い問題設定ですが, ここではその特別な場合を扱います). 
+まず, 回帰について説明します. ここで扱う回帰とは, 二つのデータの組 $(x_i, y_i)$ が与えられたときに, それらの関係を推定する問題です\footnote{なお, 一般的には $x$ が多次元の場合も考えられます.}. 
 さっそく例を見てみましょう. 
 \begin{examplebox}
 ある現象を観測して, 次のようなデータが得られたとします. 
@@ -179,6 +187,7 @@ $w_0 = 0.0790, w_1 = 1.09, w_2 = -0.0618, w_3 = -0.218$ \\
 なお, ここでの二つの分散は勝手に仮定したもので, 人間が適当に決めます. \\
 この段階ではまだデータを使っておらず, パラメータの分布は不正確です. ここからデータを用いてパラメータの分布をもっともらしいものに近づけていきます. そうすることで, より確からしい関係性を推定することができます. 
 \subsubsection{事後分布の計算}
+(注: この節の数式部分は読み飛ばしていただいても構いません.) \\
 次に, 与えられたデータとベイズの定理から, $w_i$ の事後分布を計算します. 以下, 表記の簡略化のために, $w_0, w_1, w_2, w_3$ をまとめて $\bm{w}$ と書き, データ $(x_i, y_i)$ をまとめて $\mathcal{D}$ と書きます. \\
 ベイズの定理より, 
 \begin{align}
@@ -264,7 +273,7 @@ $w_0 = 0.0790, w_1 = 1.09, w_2 = -0.0618, w_3 = -0.218$ \\
   \label{fig:bayes}
 \end{figure}
 ここで, 濃い赤い線が \eqref{eq:predictive} に示されている予測分布の平均値です. 薄い領域は, それに対して標準偏差の 2 倍を足したものと引いたものを表しています. ガウス分布なので, これはおよそ 95\% の確率でこの範囲に収まるというある種の確信度を表していると見ることもできます. データが少ない左端と右端はあまり自信がないことがわかりますね. \\
-さらに, この後新しくデータを観測することができて, 合計 100 個のデータを使えるようになったとしましょう. その場合, 以下のようになります. 
+さらに, この後新しくデータを観測することができて, 合計 100 個のデータを使えるようになった\footnote{ここではランダムに新たに 95 個の点を追加しましたが, 新しく得られる点の $x$ の値を人間が選べるとしたらどうでしょうか. 不確実性の高いところを重点的に知りたいと思うでしょう. この不確実性の認識もベイズの恩恵です. これは $x$ を AI のハイパーパラメータだと思うと(まだあまり試されていない設定を試すという)現実的なシチュエーションです.}としましょう. その場合, 以下のようになります. 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.7\textwidth]{images/bayes2_fit.png}
@@ -273,11 +282,20 @@ $w_0 = 0.0790, w_1 = 1.09, w_2 = -0.0618, w_3 = -0.218$ \\
 \end{figure}
 データが多くなったことで, 薄赤の領域が狭くなってきました. これは, たくさんのデータを得て, 信頼度が上がってきたと見ることができます. 
 \subsection{おわりに}
-ベイズ線形回帰について説明しました. 頻度論的なアプローチに対して, ベイズ的な考え方は不確実性を上手く扱えるという長所がありますが, 一方で短所もあります. その一つは, 事前分布の仮定です. 何も仮定しなくて良い最小二乗法と比べて, 
+ベイズ線形回帰について説明しました. 頻度論的なアプローチに対して, ベイズ的な考え方は不確実性を上手く扱えるという長所がありますが, 一方で短所もあります. その一つは, 事前分布の仮定です. あまり仮定をしなくて良い最小二乗法と比べて, 
 今回扱ったベイズ線形回帰は事前分布を仮定しました. この仮定はそれなりに強い仮定で, 必ずしも上手くいくとは限りません. 
 この記事を書くにあたって,  \cite{grosse2018bayesianlinearregression}, \cite{suyama2019bayesianDeepLearning} を参考にしました. また, 可視化などのためにここで用いたコードは, \url{https://github.com/Ratstar216/mayfes2026-bayes-article} で公開しています. 
 
 \begin{thebibliography}{9}
+  \bibitem{bayesian-optimization-in-alphago}
+  Chen, Y., Huang, A., Wang, Z., Antonoglou, I., Schrittwieser, J., Silver, D., \& de Freitas, N. (2018). Bayesian optimization in alphago. \textit{arXiv preprint arXiv:1812.06855}.
+  \bibitem{tutorial-on-bayesian-optimization}
+  Frazier, P. I. (2018). A tutorial on Bayesian optimization. \textit{arXiv preprint arXiv:1807.02811}.
+  \bibitem{gaussian-process-and-bayesian-optimization}
+  \textit{Lecture 16: Gaussian Processes and Bayesian Optimization}.
+  Cornell University, 2019.
+  \url{https://www.cs.cornell.edu/courses/cs4787/2019sp/notes/lecture16.pdf}
+  accessed on 2026-05-01.
   \bibitem{grosse2018bayesianlinearregression}
   Grosse, Roger and Farahmand, Amir-massoud and Carrasquilla, Juan.
   \textit{CSC 411 Lecture 19: Bayesian Linear Regression}.
@@ -285,7 +303,7 @@ $w_0 = 0.0790, w_1 = 1.09, w_2 = -0.0618, w_3 = -0.218$ \\
   \url{https://www.cs.toronto.edu/~rgrosse/courses/csc411_f18/slides/lec19-slides.pdf}
   accessed on 2026-04-26.
   \bibitem{suyama2019bayesianDeepLearning}
-  須山, 敦志.
+  須山敦志.
   \textit{ベイズ深層学習}.
   講談社, 2019.
 \end{thebibliography}
